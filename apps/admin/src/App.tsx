@@ -3,12 +3,54 @@ import { adminLogin, fetchAnalytics, fetchPendingOffers, moderateOffer, runRemin
 import { AdminAnalytics, PendingOffer } from "./types";
 
 const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : "-");
+const DEMO_EMAIL = "admin@ticino.market";
+const DEMO_PASSWORD = "Pass12345";
+
+const demoAnalytics: AdminAnalytics = {
+  users: 1240,
+  vendors: 286,
+  offers: 4216,
+  coupons: 11872,
+  pushDevices: 912
+};
+
+const demoPendingOffers: PendingOffer[] = [
+  {
+    id: "demo-offer-1",
+    title: "Brunch Ticinese -30%",
+    description: "Menu brunch completo nel weekend con bevanda inclusa.",
+    category: "food_restaurants",
+    city: "Lugano",
+    validUntil: "2026-06-30",
+    endDate: "2026-06-30",
+    createdAt: "2026-05-10T09:00:00.000Z",
+    vendor: {
+      businessName: "Bistro Lago",
+      city: "Lugano"
+    }
+  },
+  {
+    id: "demo-offer-2",
+    title: "Pacchetto Fitness Starter",
+    description: "Ingresso palestra + valutazione iniziale personalizzata.",
+    category: "fitness_sports",
+    city: "Locarno",
+    validUntil: "2026-05-28",
+    endDate: "2026-05-28",
+    createdAt: "2026-05-11T10:15:00.000Z",
+    vendor: {
+      businessName: "Pulse Gym",
+      city: "Locarno"
+    }
+  }
+];
 
 function App() {
   const [email, setEmail] = useState("admin@ticino.market");
   const [password, setPassword] = useState("Pass12345");
   const [token, setToken] = useState<string | null>(null);
   const [name, setName] = useState<string>("");
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +69,12 @@ function App() {
   );
 
   const loadDashboard = async (activeToken: string) => {
+    if (isDemoMode) {
+      setAnalytics(demoAnalytics);
+      setPendingOffers(demoPendingOffers);
+      return;
+    }
+
     const [analyticsData, offersData] = await Promise.all([
       fetchAnalytics(activeToken),
       fetchPendingOffers(activeToken)
@@ -42,7 +90,7 @@ function App() {
     void loadDashboard(token).catch((loadError) => {
       setError(loadError instanceof Error ? loadError.message : "Unable to load dashboard");
     });
-  }, [token]);
+  }, [token, isDemoMode]);
 
   const onLogin = async (event: FormEvent) => {
     event.preventDefault();
@@ -59,8 +107,21 @@ function App() {
 
       setToken(auth.token);
       setName(auth.user.name);
+      setIsDemoMode(false);
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Login failed");
+      const loginMessage = loginError instanceof Error ? loginError.message : "Login failed";
+      const canUseDemo = email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD;
+
+      if (canUseDemo) {
+        setToken("demo-token");
+        setName("Admin Demo");
+        setIsDemoMode(true);
+        setAnalytics(demoAnalytics);
+        setPendingOffers(demoPendingOffers);
+        setError("Backend non connesso: accesso in modalita demo.");
+      } else {
+        setError(loginMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -69,6 +130,11 @@ function App() {
   const onModerate = async (offerId: string, status: "APPROVED" | "REJECTED") => {
     if (!token) return;
     setError(null);
+
+    if (isDemoMode) {
+      setPendingOffers((current) => current.filter((offer) => offer.id !== offerId));
+      return;
+    }
 
     try {
       await moderateOffer(token, offerId, status);
@@ -81,6 +147,11 @@ function App() {
   const onRunReminders = async () => {
     if (!token) return;
     setError(null);
+
+    if (isDemoMode) {
+      setError("Modalita demo: reminder jobs non disponibili senza backend.");
+      return;
+    }
 
     try {
       await runReminderJobs(token);
@@ -121,7 +192,10 @@ function App() {
       <header className="topbar">
         <div>
           <h1>Welcome, {name}</h1>
-          <p>Swiss Ticino marketplace control center.</p>
+          <p>
+            Swiss Ticino marketplace control center.
+            {isDemoMode ? " Demo mode attiva." : ""}
+          </p>
         </div>
         <div className="topbar-actions">
           <button onClick={onRunReminders}>Run Reminder Jobs</button>
