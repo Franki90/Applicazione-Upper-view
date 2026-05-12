@@ -1,0 +1,11 @@
+﻿import { runReminderJobsOnce } from "../services/reminderJobsService";
+
+async function main() {
+  const result = await runReminderJobsOnce();
+  console.log(JSON.stringify(result, null, 2));
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

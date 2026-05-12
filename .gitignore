@@ -1,0 +1,15 @@
+﻿node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+dist/
+.expo/
+apps/mobile/node_modules/
+apps/api/node_modules/
+apps/api/prisma/dev.db
+.tools/
+preview-site/
+*.zip
+FULL_CODE_EXPORT_*.txt

@@ -1,0 +1,299 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum OfferStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CouponStatus {
+  DOWNLOADED
+  USED
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum SocialProvider {
+  GOOGLE
+  APPLE
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+  UNKNOWN
+}
+
+enum CouponType {
+  GENERATED
+  UPLOADED
+}
+
+enum CouponPattern {
+  MINIMAL
+  DOTS
+  WAVES
+  DIAGONAL_LINES
+  CONFETTI
+  GRADIENT
+  GEOMETRIC
+}
+
+enum CouponLayout {
+  CLASSIC
+  MODERN
+  PREMIUM
+  YOUTHFUL
+  MINIMAL
+}
+
+enum CouponBorderStyle {
+  NONE
+  SOLID
+  DASHED
+  DOUBLE
+  BOLD
+}
+
+model User {
+  id                 String          @id @default(cuid())
+  name               String
+  email              String          @unique
+  passwordHash       String?
+  role               Role            @default(CUSTOMER)
+  selectedCategoryIds String[]       @default([])
+  provider           SocialProvider?
+  providerSubject    String?
+  notificationsOptIn Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  vendorProfile     VendorProfile?
+  favorites         Favorite[]
+  offerViews        OfferView[]
+  pushDevices       PushDevice[]
+  couponRedemptions CouponRedemption[]
+
+  @@unique([provider, providerSubject])
+}
+
+model VendorProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  businessName       String
+  description        String?
+  category           String?
+  categoryIds        String[] @default([])
+  address            String?
+  city               String
+  area               String?
+  phone              String?
+  email              String?
+  website            String?
+  socialLinks        Json?
+  openingHours       Json?
+  logoUrl            String?
+  primaryColor       String   @default("#4F46E5")
+  secondaryColor     String   @default("#22C55E")
+  accentColor        String   @default("#06B6D4")
+  backgroundColor    String   @default("#F9FAFB")
+  latitude           Float?
+  longitude          Float?
+  isProfileCompleted Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offers       Offer[]
+  coupons      Coupon[]
+  subscription Subscription?
+
+  @@index([city])
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  vendorId             String             @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  status               SubscriptionStatus @default(INACTIVE)
+  monthlyPriceCents    Int                @default(2500)
+  currency             String             @default("CHF")
+  startedAt            DateTime           @default(now())
+  currentPeriodEnd     DateTime?
+  renewalReminderSentAt DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  vendor VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model Offer {
+  id                     String      @id @default(cuid())
+  vendorId               String
+  title                  String
+  category               String
+  categoryIds            String[]    @default([])
+  description            String
+  includedItems          Json?
+  terms                  String?
+  originalPrice          Float?
+  discountedPrice        Float?
+  discountPercentage     Float?
+  startDate              DateTime?
+  endDate                DateTime?
+  validUntil             DateTime?
+  location               String?
+  city                   String
+  latitude               Float?
+  longitude              Float?
+  imageUrls              Json?
+  images                 Json?
+  maxCouponDownloads     Int         @default(100)
+  usageLimitPerCustomer  Int         @default(1)
+  status                 OfferStatus @default(DRAFT)
+  viewsCount             Int         @default(0)
+  downloadsCount         Int         @default(0)
+  expiringReminderSentAt DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  vendor    VendorProfile @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  coupons   Coupon[]
+  favorites Favorite[]
+  views     OfferView[]
+
+  @@index([status, city, category])
+  @@index([endDate])
+  @@index([validUntil])
+}
+
+model Coupon {
+  id             String            @id @default(cuid())
+  offerId        String
+  vendorId       String
+  type           CouponType
+  title          String
+  subtitle       String?
+  couponCode     String            @unique
+  qrCodeUrl      String?
+  couponImageUrl String?
+  couponPdfUrl   String?
+  uploadedFileUrl String?
+  layout         CouponLayout      @default(CLASSIC)
+  pattern        CouponPattern     @default(MINIMAL)
+  primaryColor   String            @default("#4F46E5")
+  secondaryColor String            @default("#22C55E")
+  textColor      String            @default("#111827")
+  backgroundColor String           @default("#F9FAFB")
+  borderStyle    CouponBorderStyle @default(SOLID)
+  validityStart  DateTime?
+  validityEnd    DateTime?
+  terms          String?
+  downloadCount  Int               @default(0)
+  maxDownloads   Int               @default(100)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  offer       Offer              @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  vendor      VendorProfile      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  redemptions CouponRedemption[]
+
+  @@index([offerId, vendorId])
+}
+
+model CouponRedemption {
+  id           String       @id @default(cuid())
+  couponId     String
+  userId       String
+  status       CouponStatus @default(DOWNLOADED)
+  downloadedAt DateTime     @default(now())
+  usedAt       DateTime?
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  offerId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offerId])
+}
+
+model OfferView {
+  id       String   @id @default(cuid())
+  offerId  String
+  userId   String?
+  viewedAt DateTime @default(now())
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([offerId, viewedAt])
+}
+
+model PushDevice {
+  id            String         @id @default(cuid())
+  userId        String
+  expoPushToken String         @unique
+  platform      DevicePlatform @default(UNKNOWN)
+  locale        String?
+  city          String?
+  latitude      Float?
+  longitude     Float?
+  lastSeenAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([city])
+}
+
+model Category {
+  id            String   @id
+  nameIt        String
+  nameEn        String
+  nameDe        String
+  nameFr        String
+  nameEs        String
+  icon          String
+  descriptionIt String
+  descriptionEn String
+  descriptionDe String
+  descriptionFr String
+  descriptionEs String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
