@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "ticino-marketplace-api",
   "version": "1.0.0",
   "private": true,
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
-    "apple-signin-auth": "^1.10.0",
+    "apple-signin-auth": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
